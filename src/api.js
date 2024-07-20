@@ -33,5 +33,5 @@ app.post("*", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log("Listening...");
+  console.log(`Listening on port ${PORT}...`);
 });
