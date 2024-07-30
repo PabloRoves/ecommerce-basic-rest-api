@@ -1,4 +1,6 @@
 import Products from "../models/Product.js";
+import { upload } from "../api.js";
+
 //import fs from "node:fs/promises";
 
 const Product = {
@@ -6,12 +8,13 @@ const Product = {
     try {
       console.log("Request for a product received.");
       const { id } = req.params;
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Content-Type", "application/json");
+      //res.setHeader("Access-Control-Allow-Origin", "*");
+      //res.setHeader("Content-Type", "application/json");
       const product = await Products.findOne({ _id: id });
-      const base64Image = product.img.toString("base64");
-      const dataUrl = `data:image/jpeg;base64,${base64Image}`;
-      await res.status(200).json({ name: product.name, price: product.price, imagenUrl: dataUrl });
+      //const base64Image = product.img.toString("base64");
+      //const dataUrl = `data:image/jpeg;base64,${base64Image}`;
+      //await res.status(200).json({ name: product.name, price: product.price, imagenUrl: dataUrl });
+      await res.status(200).json(product);
       console.log(`Product ${product.name} info sended to client`);
     } catch (err) {
       res.status(500).send();
@@ -21,13 +24,11 @@ const Product = {
   list: async (req, res) => {
     try {
       console.log("Request to list products received.");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Content-Type", "application/json");
       const products = await Products.find();
-      //console.log(products);
-      const body = await processProduct(products);
-      //console.log(body);
-      await res.status(200).json(body);
+      //console.log(Object.stringify(products));
+      const processedProducts = await processProducts(products);
+
+      await res.status(200).json(processedProducts);
       console.log("Products sended to client.");
     } catch (err) {
       res.status(500).send();
@@ -36,23 +37,31 @@ const Product = {
   },
   create: async (req, res) => {
     try {
-      console.log("Request to create a product received.");
-      res.header("Access-Control-Allow-Origin", "*");
+      console.log("ENDPOINT Create - Request to create a product received.");
       console.log("Creating product...");
-      const product = new Products(req.body);
+      const { name, price } = req.body;
+      const img = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
+      const product = new Products({
+        name,
+        price,
+        img,
+      });
       const savedProduct = await product.save();
       await res.status(201).send(savedProduct._id);
-      console.log(`Product name "${savedProduct.name}" created. Product Id returned to client.`);
+      console.log(`ENDPOINT Create - Product name "${savedProduct.name}" created. Product Id returned to client.`);
     } catch (err) {
-      res.status(500).send();
-      console.log(err);
+      await res.status(500).json({ error: err.message });
+      console.log(`ENDPOINT Create - ${err}`);
     }
   },
+
   update: async (req, res) => {
     try {
       console.log("Request to update a product received.");
       const { id } = req.params;
-      //res.setHeader("Access-Control-Allow-Origin", "*");
       const product = await Products.findOne({ _id: id });
       Object.assign(product, req.body);
       await product.save();
@@ -64,6 +73,14 @@ const Product = {
     }
   },
   destroy: async (req, res) => {
+    //res.header("Access-Control-Allow-Origin", "*");
+    //res.header("Access-Control-Allow-Methods", "DELETE");
+    //res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    /* if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    } */
+
     try {
       console.log("Request to delete a product received.");
       const { id } = req.params;
@@ -78,20 +95,21 @@ const Product = {
         console.log(`Product with id: ${id} doesn't found.`);
       }
     } catch (err) {
-      res.status(500).send();
+      await res.status(500).send();
       console.log(err);
     }
   },
 };
 
-async function processProduct(products) {
-  if (products == null) return null;
+async function processProducts(products) {
+  if (products == null) return {};
 
-  return products.map((product) => {
-    const base64Image = product.img.toString("base64");
-    const dataUrl = `data:image/jpeg;base64,${base64Image}`;
-    return { id: product._id, name: product.name, price: product.price, img: dataUrl };
-  });
+  return products.map((product) => ({
+    id: product._id,
+    name: product.name,
+    price: product.price,
+    img: `data:${product.img.contentType};base64,${product.img.data.toString("base64")}`,
+  }));
 }
 
 export default Product;
